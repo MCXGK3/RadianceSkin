@@ -318,11 +318,11 @@ namespace RadianceSkin
                 {
                     Log(s);
                 }*/
+                if (!skinused) dream = self.gameObject.GetComponent<EnemyHitEffectsGhost>().ghostHitPt.GetComponent<ParticleSystemRenderer>().sharedMaterials[0].mainTexture;
                 if (skinList[set.skinID].v7)
                 {
                     //Log(self.gameObject.GetComponent<EnemyHitEffectsGhost>().ghostHitPt.GetComponent<ParticleSystemRenderer>().materials[1].mainTexture);
                     //TextureUtils.WriteTextureToFile(self.gameObject.GetComponent<EnemyHitEffectsGhost>().ghostHitPt.GetComponent<ParticleSystemRenderer>().materials[1].mainTexture, Path.Combine(_dllFolder, "ghosthit.png"));
-                   if(!skinused) dream = self.gameObject.GetComponent<EnemyHitEffectsGhost>().ghostHitPt.GetComponent<ParticleSystemRenderer>().sharedMaterials[0].mainTexture;
                     self.gameObject.GetComponent<EnemyHitEffectsGhost>().ghostHitPt.GetComponent<ParticleSystemRenderer>().sharedMaterials[0].mainTexture = skinList[set.skinID].skin7;
                     var main = self.gameObject.GetComponent<EnemyHitEffectsGhost>().ghostHitPt.GetComponent<ParticleSystem>().main;
                      main.startColor  = new ParticleSystem.MinMaxGradient(Color.white);
