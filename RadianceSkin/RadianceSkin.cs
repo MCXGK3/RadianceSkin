@@ -73,6 +73,7 @@ namespace RadianceSkin
                                                      "Ghost Hit Pt",
                                                       "dream_particle_03 (3)"};
         List<Texture> texs = new List<Texture>();
+        Dictionary<string, Dictionary<string, string>> changeWords=new();
         Texture dream;
         Sprite spr;
         SpriteRenderer Halo;
@@ -98,7 +99,7 @@ namespace RadianceSkin
 
         public override string GetVersion()
         {
-            return "m.x.0.4";
+            return "m.x.0.5";
         }
 
         public override void Initialize(Dictionary<string, Dictionary<string, GameObject>> preloadedObjects)
@@ -107,7 +108,10 @@ namespace RadianceSkin
 
             Instance = this;
             On.PlayMakerFSM.OnEnable += ReplaceSkin;
+            ModHooks.LanguageGetHook += Changelanguage;
             UnityEngine.SceneManagement.SceneManager.activeSceneChanged += FindStatue;
+            skinNames.Clear();  
+            skinList.Clear();   
             skinNames.Add("关闭");
             skinList.Add(new());
             if (Directory.Exists(_skinFolder))
@@ -121,83 +125,104 @@ namespace RadianceSkin
                     {
                         string tempname = name.Split('\\')[name.Split('\\').Length - 1];
                         Log(tempname);
-                        if (!name.EndsWith(".png"))
+                        if (!name.EndsWith(".png")&&!name.EndsWith(".txt"))
                         {
                             continue;
                         }
                         tempname = tempname.Split('.')[0];
                         //string skinname = tempname.Split('-')[0];
-                       //string skinid = tempname.Split('-')[1];
-                        if (!n.IsAny(skinNames.ToArray()))
+                        //string skinid = tempname.Split('-')[1];
+                        if (name.EndsWith(".txt"))
                         {
-                            skinNames.Add(n);
-                            i = skinNames.Count - 1;
-                            skinList.Add(new radianceSkin { name = n});
+                            if (!changeWords.ContainsKey(n)) { changeWords.Add(n, new Dictionary<string, string>()); }
+                            foreach(var str in File.ReadAllLines(name))
+                            {
+                                    var dic = changeWords[n];
+                                string key = str.Split('=')[0];
+                                string value = str.Split('=')[1];
+                                if (!dic.ContainsKey(key))
+                                {
+                                    dic.Add(key, value);
+                                }
+                                
+                                  
+                            }
+                            /*if(!changeWords.ContainsKey(tempname))
+                            changeWords.Add(tempname, File.ReadAllText(name));*/
                         }
-                        else
+                        if (name.EndsWith(".png"))
                         {
-                            i = skinNames.IndexOf(n);
+                            if (!n.IsAny(skinNames.ToArray()))
+                            {
+                                skinNames.Add(n);
+                                i = skinNames.Count - 1;
+                                skinList.Add(new radianceSkin { name = n });
+                            }
+                            else
+                            {
+                                i = skinNames.IndexOf(n);
+                            }
+                            switch (tempname)
+                            {
+                                case "Radiance0":
+                                    {
+                                        skinList[i].skin1.LoadImage(File.ReadAllBytes(name), true);
+                                        skinList[i].v1 = true;
+                                        break;
+                                    }
+                                case "Radiance1":
+                                    {
+                                        skinList[i].skin2.LoadImage(File.ReadAllBytes(name), true);
+                                        skinList[i].v2 = true;
+                                        break;
+                                    }
+                                case "Radiance2":
+                                    {
+                                        skinList[i].skin3.LoadImage(File.ReadAllBytes(name), true);
+                                        skinList[i].v3 = true;
+                                        break;
+                                    }
+                                case "Plats":
+                                    {
+                                        skinList[i].skin4.LoadImage(File.ReadAllBytes(name), true);
+                                        skinList[i].v4 = true;
+                                        break;
+                                    }
+                                case "ShadeLord":
+                                    {
+                                        skinList[i].skin5.LoadImage(File.ReadAllBytes(name), true);
+                                        skinList[i].v5 = true;
+                                        break;
+                                    }
+                                case "Feather":
+                                    {
+                                        skinList[i].skin6.LoadImage(File.ReadAllBytes(name), true);
+                                        skinList[i].v6 = true;
+                                        break;
+                                    }
+                                case "DreamEffect":
+                                    {
+                                        skinList[i].skin7.LoadImage(File.ReadAllBytes(name), true);
+                                        skinList[i].v7 = true;
+                                        break;
+                                    }
+                                case "Statue":
+                                    {
+                                        skinList[i].skin8.LoadImage(File.ReadAllBytes(name), true);
+                                        skinList[i].v8 = true;
+                                        break;
+                                    }
+                                case "Halo":
+                                    {
+                                        skinList[i].skin9.LoadImage(File.ReadAllBytes(name), true);
+                                        skinList[i].v9 = true;
+                                        break;
+                                    }
+                                default:
+                                    break;
+                            }
+                            Log(tempname + "is loaded");
                         }
-                        switch (tempname)
-                        {
-                            case "Radiance0":
-                                {
-                                    skinList[i].skin1.LoadImage(File.ReadAllBytes(name), true);
-                                    skinList[i].v1 = true;
-                                    break;
-                                }
-                            case "Radiance1":
-                                {
-                                    skinList[i].skin2.LoadImage(File.ReadAllBytes(name), true);
-                                    skinList[i].v2 = true;
-                                    break;
-                                }
-                            case "Radiance2":
-                                {
-                                    skinList[i].skin3.LoadImage(File.ReadAllBytes(name), true);
-                                    skinList[i].v3 = true;
-                                    break;
-                                }
-                            case "Plats":
-                                {
-                                    skinList[i].skin4.LoadImage(File.ReadAllBytes(name), true);
-                                    skinList[i].v4 = true;
-                                    break;
-                                }
-                            case "ShadeLord":
-                                {
-                                    skinList[i].skin5.LoadImage(File.ReadAllBytes(name), true);
-                                    skinList[i].v5 = true;
-                                    break;
-                                }
-                            case "Feather":
-                                {
-                                    skinList[i].skin6.LoadImage(File.ReadAllBytes(name), true);
-                                    skinList[i].v6 = true;
-                                    break;
-                                }
-                            case "DreamEffect":
-                                {
-                                    skinList[i].skin7.LoadImage(File.ReadAllBytes(name), true);
-                                    skinList[i].v7 = true;
-                                    break;
-                                }
-                            case "Statue":
-                                {
-                                    skinList[i].skin8.LoadImage(File.ReadAllBytes(name), true);
-                                    skinList[i].v8 = true;
-                                    break;
-                                }
-                            case "Halo":
-                                {
-                                    skinList[i].skin9.LoadImage(File.ReadAllBytes(name), true);
-                                    skinList[i].v9 = true;
-                                    break;
-                                }
-                            default:
-                                break;
-                        }
-                        Log(tempname + "is loaded");
                     }
                 }
 
@@ -210,6 +235,25 @@ namespace RadianceSkin
             }
 
             Log("Initialized");
+        }
+
+        private string Changelanguage(string key, string sheetTitle, string orig)
+        {
+            if (changeWords.ContainsKey(skinNames[set.skinID])) {
+                var dic = changeWords[skinNames[set.skinID]];
+                if (dic.ContainsKey(orig))
+                {
+                    return dic[orig];
+                }
+                else
+                {
+                    return orig;
+                }
+                    }
+            else
+            {
+                return orig;
+            }
         }
 
         private void FindStatue(Scene arg0, Scene arg1)
@@ -238,6 +282,7 @@ namespace RadianceSkin
                 }
                
                 statue.GetComponent<SpriteRenderer>().sprite = MakeSprite(skinList[set.skinID].skin8, s.pixelsPerUnit);
+                    statue.GetComponent<SpriteRenderer>().sprite.name = "GG_statues_0014_13";
                     Log("OK");
                   
             }
@@ -451,6 +496,7 @@ namespace RadianceSkin
         public void Unload()
         {
             On.PlayMakerFSM.OnEnable -= ReplaceSkin;
+            ModHooks.LanguageGetHook -= Changelanguage;
         }
 
         public List<IMenuMod.MenuEntry> GetMenuData(IMenuMod.MenuEntry? toggleButtonEntry)
