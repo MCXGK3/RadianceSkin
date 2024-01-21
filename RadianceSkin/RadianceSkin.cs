@@ -8,85 +8,107 @@ using System.Reflection;
 using UnityEngine;
 using Satchel;
 using UObject = UnityEngine.Object;
-using System.Linq;
-using Steamworks;
 using UnityEngine.SceneManagement;
-using UnityEngine.XR;
 using HutongGames.PlayMaker.Actions;
-using System.Security.Policy;
-using Satchel.Futils;
-using System.Runtime.CompilerServices;
+using WavLib;
+using Newtonsoft.Json;
+using System.Drawing;
+using System.Drawing.Imaging;
 
 namespace RadianceSkin
 {
-    public class RadianceSkin : Mod,ITogglableMod,IMenuMod,IGlobalSettings<Setting>
+    public class RadianceSkin : Mod, ITogglableMod, IMenuMod, IGlobalSettings<Setting>
     {
         internal static RadianceSkin Instance;
         private static readonly string _dllFolder = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
         private string _skinFolder = Path.Combine(_dllFolder, "Skins");
-        public Setting set=new();
+        public Setting set = new();
+        const string hornetScene = "Deepnest_East_Hornet";
+        const string wind = "_Scenery/blizzard_particles";
+        public GameObject windg=null;
+        const string snow = "pre_blizzard_particles";
+        public GameObject snowg=null;
+        List<GameObject> customSprites= new List<GameObject>();
+        FileSystemWatcher watcher=null;
+        public int watcherID=0;
 
-        //public override List<ValueTuple<string, string>> GetPreloadNames()
-        //{
-        //    return new List<ValueTuple<string, string>>
-        //    {
-        //        new ValueTuple<string, string>("White_Palace_18", "White Palace Fly")
-        //    };
-        //}
-        public class radianceSkin
+        public override List<ValueTuple<string, string>> GetPreloadNames()
+        {
+            return new List<ValueTuple<string, string>>
+            {
+
+                new ValueTuple<string, string>(hornetScene, wind),
+                new ValueTuple<string, string>(hornetScene, snow),
+            };
+        }
+
+        public class ImagePosition
+        {
+            public float x=0f;
+            public float y=0f;
+            public float z=0f;
+            public float a=1f;
+        }
+        public class BackImage
+        {
+            public enum ImageType
+            {
+                PNG,
+                GIF
+            }
+            public string name;
+            public ImageType type;
+            public List<ImagePosition> positions=new();
+            [NonSerialized]
+            public GameObject gameObject;
+        }
+        public class Skin
         {
             public string name;
-            //public string author;
-            public bool v1 = false;
-            public bool v2 = false;
-            public bool v3 = false;
-            public bool v4 = false;
-            public bool v5 = false;
-            public bool v6 = false;
-            public bool v7 = false;
-            public bool v8 = false;
-            public bool v9 = false;
-            public Texture2D skin1 = new(1, 1);
-            public Texture2D skin2 = new(1, 1);
-            public Texture2D skin3 = new(1, 1);
-            public Texture2D skin4 = new(1, 1);
-            public Texture2D skin5 = new(1, 1);
-            public Texture2D skin6 = new(1, 1);
-            public Texture2D skin7 = new(1, 1);
-            public Texture2D skin8 = new(1, 1);
-            public Texture2D skin9 = new(1, 1);
+            public int id;
+            public Texture2D skin0 = null;
+            public Texture2D skin1 = null;
+            public Texture2D skin2 = null;
+            public Texture2D plats = null;
+            public Texture2D shadeLord = null;
+            public Texture2D dreamEffect = null;
+            public Texture2D statue = null;
+            public Texture2D feather = null;
+            public Texture2D halo = null;
+            public Texture2D cloud= null;
+            public AudioClip music = null;
+            public Dictionary<string, string> replace = new();
+            public LocalSetting local = new LocalSetting();
+            public List<BackImage> backimageSettings = new List<BackImage>();
+            public Dictionary<string,Sprite> images=new Dictionary<string,Sprite>();
+            public Dictionary<string, List<Texture2D>> gifs = new();
         }
-        public List<radianceSkin> skinList = new List<radianceSkin>();
+        public class OriSkin
+        {
+            public Texture skin0 = null;
+            public Texture skin1 = null;
+            public Texture skin2 = null;
+            public Texture plats = null;
+            public Texture shadeLord = null;
+            public Texture dreamEffect = null;
+            public Sprite statue = null;
+            public Texture feather = null;
+            public Sprite halo = null;
+            public Sprite cloud = null;
+            public AudioClip music = null;
+            public bool shotYes = false;
+            public ParticleSystem.MinMaxGradient shotColor = null;
+        }
+        public Dictionary<string, Skin> skins = new();
+        public OriSkin oriSkin = new();
+
+
+        
         public List<string> skinNames = new List<string>();
-        string[] dreamdotstring = { "Pt StunOutBurst", 
-                                                    "Pt StunOutRise", 
-                                                        "Pt Tele Out", 
-                                                   "Pt AscendRise", 
-                                                    "Eye Leak Pt",
-                                                    "Eye Final Pt", 
-                                                    "Eye Break Pt", 
-                                                "Death Stream Pt", 
-                                                    "Death Pt",
-                                                    "Attack Pt",
-                                                    "Shot Charge 2",
-                                                    "Shot Charge",
-                                                     "Ghost Hit Pt",
-                                                      "dream_particle_03 (3)"};
-        List<Texture> texs = new List<Texture>();
-        Dictionary<string, Dictionary<string, string>> changeWords=new();
-        Texture dream;
-        Sprite spr;
-        SpriteRenderer Halo;
-        Sprite storeHalo;
-        public bool skinused=false;
-        public bool statueused=false;
+
+        public bool skinused = false;
+        public bool statueused = false;
         public bool found = false;
-        Material plats;
-        Material hand;
-        Material feather;
-        //Material Halo;
-        List<Material> dreamdot=new();
-        Material statue;
 
         private int i = 0;
 
@@ -94,139 +116,188 @@ namespace RadianceSkin
 
         public RadianceSkin() : base("RadianceSkin")
         {
-           Instance = this;
+            Instance = this;
         }
 
         public override string GetVersion()
         {
-            return "m.x.0.5";
+            return "t.e.0.9";
         }
 
         public override void Initialize(Dictionary<string, Dictionary<string, GameObject>> preloadedObjects)
         {
             Log("Initializing");
-
             Instance = this;
             On.PlayMakerFSM.OnEnable += ReplaceSkin;
             ModHooks.LanguageGetHook += Changelanguage;
+            ModHooks.ObjectPoolSpawnHook += RemoveOrbLight;
             UnityEngine.SceneManagement.SceneManager.activeSceneChanged += FindStatue;
-            skinNames.Clear();  
-            skinList.Clear();   
+           
+            GetWindAndSnow(preloadedObjects);
+            skins.Clear();
+
+
+            skinNames.Clear();
             skinNames.Add("关闭");
-            skinList.Add(new());
             if (Directory.Exists(_skinFolder))
             {
-                string[]nas=Directory.GetDirectories(_skinFolder);
-                foreach(var ns in nas)
+                string[] skinFolderNames = Directory.GetDirectories(_skinFolder);
+                foreach (var skinFolderName in skinFolderNames)
                 {
-                    string[] names = Directory.GetFiles(ns);
-                    string n = ns.Split('\\')[ns.Split('\\').Length - 1];
-                    foreach (var name in names)
+                    string skinName = skinFolderName.Split('\\')[skinFolderName.Split('\\').Length - 1];
+                    skinNames.Add(skinName);
+                    skins.Add(skinName, new Skin() { name = skinName });
+                    var skin = skins[skinName];
+                    var dic = skins[skinName].replace;
+                    skin.id = skinNames.IndexOf(skinName);
+
+                    string[] assetsNames = Directory.GetFiles(skinFolderName);
+
+                    foreach (var assestName in assetsNames)
                     {
-                        string tempname = name.Split('\\')[name.Split('\\').Length - 1];
+                        string tempname = assestName.Split('\\')[assestName.Split('\\').Length - 1];
                         Log(tempname);
-                        if (!name.EndsWith(".png")&&!name.EndsWith(".txt"))
+                        if (!assestName.EndsWith(".png") && !assestName.EndsWith(".txt") && !assestName.EndsWith(".wav")&&!assestName.EndsWith(".gif"))
                         {
                             continue;
                         }
                         tempname = tempname.Split('.')[0];
-                        //string skinname = tempname.Split('-')[0];
-                        //string skinid = tempname.Split('-')[1];
-                        if (name.EndsWith(".txt"))
+                        if (assestName.EndsWith(".txt"))
                         {
-                            if (!changeWords.ContainsKey(n)) { changeWords.Add(n, new Dictionary<string, string>()); }
-                            foreach(var str in File.ReadAllLines(name))
+                            foreach (var str in File.ReadAllLines(assestName))
                             {
-                                    var dic = changeWords[n];
-                                string key = str.Split('=')[0];
-                                string value = str.Split('=')[1];
-                                if (!dic.ContainsKey(key))
+                                try
                                 {
-                                    dic.Add(key, value);
+                                    string key = str.Split('=')[0];
+                                    string value = str.Split('=')[1];
+                                    value = value.Replace("\\n", "\n");
+                                    if (!dic.ContainsKey(key))
+                                    {
+                                        dic.Add(key, value);
+                                    }
                                 }
-                                
-                                  
+                                catch { }
                             }
-                            /*if(!changeWords.ContainsKey(tempname))
-                            changeWords.Add(tempname, File.ReadAllText(name));*/
+
                         }
-                        if (name.EndsWith(".png"))
+                        if (assestName.EndsWith(".png"))
                         {
-                            if (!n.IsAny(skinNames.ToArray()))
-                            {
-                                skinNames.Add(n);
-                                i = skinNames.Count - 1;
-                                skinList.Add(new radianceSkin { name = n });
-                            }
-                            else
-                            {
-                                i = skinNames.IndexOf(n);
-                            }
                             switch (tempname)
                             {
                                 case "Radiance0":
                                     {
-                                        skinList[i].skin1.LoadImage(File.ReadAllBytes(name), true);
-                                        skinList[i].v1 = true;
+                                        skin.skin0 = new(1, 1);
+                                        skin.skin0.LoadImage(File.ReadAllBytes(assestName), true);
+                                        /*skinList[i].skin1.LoadImage(File.ReadAllBytes(assestName), true);
+                                        skinList[i].v1 = true;*/
                                         break;
                                     }
                                 case "Radiance1":
                                     {
-                                        skinList[i].skin2.LoadImage(File.ReadAllBytes(name), true);
-                                        skinList[i].v2 = true;
+                                        skin.skin1 = new(1, 1);
+                                        skin.skin1.LoadImage(File.ReadAllBytes(assestName), true);
+                                        /*skinList[i].skin2.LoadImage(File.ReadAllBytes(assestName), true);
+                                        skinList[i].v2 = true;*/
                                         break;
                                     }
                                 case "Radiance2":
                                     {
-                                        skinList[i].skin3.LoadImage(File.ReadAllBytes(name), true);
-                                        skinList[i].v3 = true;
+                                        skin.skin2 = new(1, 1);
+                                        skin.skin2.LoadImage(File.ReadAllBytes(assestName), true);
+                                        /*skinList[i].skin3.LoadImage(File.ReadAllBytes(assestName), true);
+                                        skinList[i].v3 = true;*/
                                         break;
                                     }
                                 case "Plats":
                                     {
-                                        skinList[i].skin4.LoadImage(File.ReadAllBytes(name), true);
-                                        skinList[i].v4 = true;
+                                        skin.plats = new(1, 1);
+                                        skin.plats.LoadImage(File.ReadAllBytes(assestName), true);
+                                        /*skinList[i].skin4.LoadImage(File.ReadAllBytes(assestName), true);
+                                        skinList[i].v4 = true;*/
                                         break;
                                     }
                                 case "ShadeLord":
                                     {
-                                        skinList[i].skin5.LoadImage(File.ReadAllBytes(name), true);
-                                        skinList[i].v5 = true;
+                                        skin.shadeLord = new(1, 1);
+                                        skin.shadeLord.LoadImage(File.ReadAllBytes(assestName), true);
+                                        /*skinList[i].skin5.LoadImage(File.ReadAllBytes(assestName), true);
+                                        skinList[i].v5 = true;*/
                                         break;
                                     }
                                 case "Feather":
                                     {
-                                        skinList[i].skin6.LoadImage(File.ReadAllBytes(name), true);
-                                        skinList[i].v6 = true;
+                                        skin.feather = new(1, 1);
+                                        skin.feather.LoadImage(File.ReadAllBytes(assestName), true);
+                                        /*skinList[i].skin6.LoadImage(File.ReadAllBytes(assestName), true);
+                                        skinList[i].v6 = true;*/
                                         break;
                                     }
                                 case "DreamEffect":
                                     {
-                                        skinList[i].skin7.LoadImage(File.ReadAllBytes(name), true);
-                                        skinList[i].v7 = true;
+                                        skin.dreamEffect = new(1, 1);
+                                        skin.dreamEffect.LoadImage(File.ReadAllBytes(assestName), true);
+                                        /*skinList[i].skin7.LoadImage(File.ReadAllBytes(assestName), true);
+                                        skinList[i].v7 = true;*/
                                         break;
                                     }
                                 case "Statue":
                                     {
-                                        skinList[i].skin8.LoadImage(File.ReadAllBytes(name), true);
-                                        skinList[i].v8 = true;
+                                        skin.statue = new(1, 1);
+                                        skin.statue.LoadImage(File.ReadAllBytes(assestName), true);
+                                        /*skinList[i].skin8.LoadImage(File.ReadAllBytes(assestName), true);
+                                        skinList[i].v8 = true;*/
                                         break;
                                     }
                                 case "Halo":
                                     {
-                                        skinList[i].skin9.LoadImage(File.ReadAllBytes(name), true);
-                                        skinList[i].v9 = true;
+                                        skin.halo = new(1, 1);
+                                        skin.halo.LoadImage(File.ReadAllBytes(assestName), true);
+                                        /*skinList[i].skin9.LoadImage(File.ReadAllBytes(assestName), true);
+                                        skinList[i].v9 = true;*/
+                                        break;
+                                    }
+                                case "Cloud":
+                                    {
+                                        skin.cloud=new(1, 1);
+                                        skin.cloud.LoadImage(File.ReadAllBytes(assestName), true);
                                         break;
                                     }
                                 default:
+                                    skin.backimageSettings.Add(new BackImage() { name = tempname,type=BackImage.ImageType.PNG});
+                                    skin.images.Add(tempname, MakeSprite(TextureUtils.LoadTextureFromFile(assestName), 64f));
                                     break;
                             }
-                            Log(tempname + "is loaded");
                         }
+                        if (assestName.EndsWith(".gif"))
+                        {
+                            
+                            
+                            /*skin.backimageSettings.Add(new BackImage() { name = tempname, type = BackImage.ImageType.GIF });
+                            Log("BEGIN");
+                            Log(assestName.ToCharArray());
+                            System.Drawing.Image image = System.Drawing.Image.FromFile(assestName);
+                            Log(image);
+                            Log("IMAGE");
+                            skin.gifs.Add(tempname, MyGifSet(System.Drawing.Image.FromFile(assestName)));*/
+                        }
+                        if (assestName.EndsWith(".wav"))
+                        {
+                            try
+                            {
+                                skin.music = LoadAudioClip(assestName, tempname);
+
+                                Log("MUSIC OK");
+                            }
+                            catch (Exception e) { Log(e); }
+                        }
+                        Log(skinName+" "+ tempname + "is loaded");
                     }
+                    Log(skin.backimageSettings.Count);
+                    LoadLocal(skin.id);
+                    LoadBackImage(skin.id);
                 }
 
-                
+
 
             }
             else
@@ -234,275 +305,408 @@ namespace RadianceSkin
                 Directory.CreateDirectory(_skinFolder);
             }
 
+            //处理异常情况
+            if (!skins.ContainsKey(skinNames[set.skinID]))
+            {
+                set.skinID = 0;
+            }
+
             Log("Initialized");
+        }
+
+
+        private GameObject RemoveOrbLight(GameObject @object)
+        {
+            if(@object.name.Contains("Radiant Orb"))
+            {
+                if (set.skinID != 0) { if (!skins[skinNames[set.skinID]].local.orblight) { @object.FindGameObjectInChildren("Fader").GetComponent<SpriteRenderer>().enabled = false; } else { @object.FindGameObjectInChildren("Fader").GetComponent<SpriteRenderer>().enabled = true; } }
+                else { @object.FindGameObjectInChildren("Fader").GetComponent<SpriteRenderer>().enabled = true;  }
+            }
+            return @object;
+        }
+
+
+        private void GetWindAndSnow(Dictionary<string, Dictionary<string, GameObject>> preloadedObjects)
+        {
+            windg = GameObject.Instantiate(preloadedObjects[hornetScene][wind]);
+            snowg = GameObject.Instantiate(preloadedObjects[hornetScene][snow]);
+            UObject.DontDestroyOnLoad(windg);
+            UObject.DontDestroyOnLoad(snowg);
+            windg.SetActive(false);
+            snowg.SetActive(false);
         }
 
         private string Changelanguage(string key, string sheetTitle, string orig)
         {
-            if (changeWords.ContainsKey(skinNames[set.skinID])) {
-                var dic = changeWords[skinNames[set.skinID]];
+            if (set.skinID != 0 && skins.ContainsKey(skinNames[set.skinID]))
+            {
+                var dic = skins[skinNames[set.skinID]].replace;
                 if (dic.ContainsKey(orig))
                 {
                     return dic[orig];
                 }
-                else
-                {
-                    return orig;
-                }
-                    }
-            else
-            {
-                return orig;
             }
+            return orig;
         }
 
         private void FindStatue(Scene arg0, Scene arg1)
         {
-            Log(arg0.name + "         " + arg1.name);
-            if (arg1.name == "GG_Workshop") 
+            if (arg1.name == "GG_Workshop")
             {
-                    var gs = arg1.GetAllGameObjects();
-                    int i = 0;
-                    Sprite s=null;
-                GameObject statue=null;
-                    foreach (var g in gs)
-                    {
-                        if (g.name == "GG_statues_0006_5 (1)"&&g.GetComponent<SpriteRenderer>().sprite.name== "GG_statues_0014_13")
-                        {
-                                s=g.GetComponent<SpriteRenderer>().sprite;
-                        //TextureUtils.WriteTextureToFile(s.texture,Path.Combine(_dllFolder,s.name+".png"));
-                            statue = g;
-                        }
-                    }
-            if (skinList[set.skinID].v8)
-            {
-                if (!statueused)
+                var gs = arg1.GetAllGameObjects();
+                int i = 0;
+                Sprite s = null;
+                GameObject statue = null;
+                foreach (var g in gs)
                 {
-                        spr = s;
+                    if (g.name == "GG_statues_0006_5 (1)" && g.GetComponent<SpriteRenderer>().sprite.name == "GG_statues_0014_13")
+                    {
+                        s = g.GetComponent<SpriteRenderer>().sprite;
+                        statue = g;
+                    }
                 }
-               
-                statue.GetComponent<SpriteRenderer>().sprite = MakeSprite(skinList[set.skinID].skin8, s.pixelsPerUnit);
+                if (oriSkin.statue == null)
+                {
+                    oriSkin.statue = s;
+                }
+                if (set.skinID != 0 && skins[skinNames[set.skinID]].statue != null)
+                {
+                    statue.GetComponent<SpriteRenderer>().sprite = MakeSprite(skins[skinNames[set.skinID]].statue, s.pixelsPerUnit);
+                    Log("PPU   " + s.pixelsPerUnit);
                     statue.GetComponent<SpriteRenderer>().sprite.name = "GG_statues_0014_13";
                     Log("OK");
-                  
-            }
+
+                }
                 else
                 {
-                    if (statueused)
-                    {
-                        statue.GetComponent<SpriteRenderer>().sprite = spr;
-                    }
+                    statue.GetComponent<SpriteRenderer>().sprite = oriSkin.statue;
                 }
-        }
+            }
+
+            if (arg0.name == "GG_Radiance")
+            {
+                if(windg.activeSelf)windg.LocateMyFSM("Control").SendEvent("BLIZZARD END");
+                windg.SetActive(false);
+                snowg.SetActive(false);
+                if (watcher != null) {  watcher.EnableRaisingEvents = false; watcher.Dispose(); watcher = null; }
+            }
+            
         }
 
-            private void ReplaceSkin(On.PlayMakerFSM.orig_OnEnable orig, PlayMakerFSM self)
+        private void ReplaceSkin(On.PlayMakerFSM.orig_OnEnable orig, PlayMakerFSM self)
         {
-            if(self.FsmName=="Control"&&self.gameObject.name=="Boss Control")
+            //在bosscontrol的起始阶段替换了辐光的三张主图和音乐
+            if (self.FsmName == "Control" && self.gameObject.name == "Boss Control")
             {
-                
+                //TODO替换场景颜色
                 try
                 {
-                    var mat = self.FsmVariables.FindFsmGameObject("Radiance").Value.GetComponent<tk2dSprite>().Collection.materials;
-                    if (skinList[set.skinID].v9) self.gameObject.AddComponent<WaitForHalo>();
-                    if (!skinused && set.skinID != 0)
+                    var absoluteRadiance = self.FsmVariables.FindFsmGameObject("Radiance").Value;
+                    var radianceRoar = self.FsmVariables.FindFsmGameObject("Radiance Roar").Value;
+                    var mat = absoluteRadiance.GetComponent<tk2dSprite>().Collection.materials;
+                    var halo = radianceRoar.FindGameObjectInChildren("Halo").GetComponent<SpriteRenderer>();
+                    var feather = radianceRoar.FindGameObjectInChildren("Roar Feathers").GetComponent<ParticleSystemRenderer>().sharedMaterials[0];
+                    var plats = GameObject.Find("Plat Sets").GetComponentsInChildren<tk2dSprite>()[0].Collection.materials[0];
+                    var shadelord = self.gameObject.Find("Shade Lord Hand").GetComponent<tk2dSprite>().Collection.materials[0];
+                    var dream = absoluteRadiance.GetComponent<EnemyHitEffectsGhost>().ghostHitPt.GetComponent<ParticleSystemRenderer>().sharedMaterials[0];
+
+                    if (oriSkin.skin0 == null) oriSkin.skin0 = mat[0].mainTexture;
+                    if (oriSkin.skin1 == null) oriSkin.skin1 = mat[1].mainTexture;
+                    if (oriSkin.skin2 == null) oriSkin.skin2 = mat[2].mainTexture;
+                    if (oriSkin.shadeLord == null) oriSkin.shadeLord = shadelord.mainTexture;
+                    if (oriSkin.plats == null) oriSkin.plats = plats.mainTexture;
+                    if (oriSkin.halo == null) oriSkin.halo = halo.sprite;
+                    if (oriSkin.feather == null) oriSkin.feather = feather.mainTexture;
+                    if (oriSkin.dreamEffect == null) oriSkin.dreamEffect = dream.mainTexture;
+
+                    if (set.skinID != 0)
                     {
-                        texs.Add(mat[0].mainTexture);
-                        texs.Add(mat[1].mainTexture);
-                        texs.Add(mat[2].mainTexture);
-                        if (skinList[set.skinID].v1) { mat[0].mainTexture = skinList[set.skinID].skin1; Log("1 OK"); }
-                        if (skinList[set.skinID].v2) { mat[1].mainTexture = skinList[set.skinID].skin2; Log("2 OK"); }
-                        if (skinList[set.skinID].v3) { mat[2].mainTexture = skinList[set.skinID].skin3; Log("3 OK"); }
+                        LoadLocal(set.skinID);
+                        LoadBackImage(set.skinID);
+                        
+                        
+                        var currentSkin = skins[skinNames[set.skinID]];
+                        if (currentSkin.skin0 != null) mat[0].mainTexture = currentSkin.skin0;
+                        else mat[0].mainTexture = oriSkin.skin0;
+                        if (currentSkin.skin1 != null) mat[1].mainTexture = currentSkin.skin1;
+                        else mat[1].mainTexture = oriSkin.skin1;
+                        if (currentSkin.skin2 != null) mat[2].mainTexture = currentSkin.skin2;
+                        else mat[2].mainTexture = oriSkin.skin2;
+                        if (currentSkin.plats != null) plats.mainTexture = currentSkin.plats;
+                        else plats.mainTexture = oriSkin.plats;
+                        if (currentSkin.feather != null) feather.mainTexture = currentSkin.feather;
+                        else feather.mainTexture = oriSkin.feather;
+                        if (currentSkin.shadeLord != null) shadelord.mainTexture = currentSkin.shadeLord;
+                        else shadelord.mainTexture = oriSkin.shadeLord;
+                        if (currentSkin.dreamEffect != null) dream.mainTexture = currentSkin.dreamEffect;
+                        else dream.mainTexture = oriSkin.dreamEffect;
+                        if (currentSkin.halo != null) halo.sprite = MakeSprite(currentSkin.halo, halo.sprite.pixelsPerUnit);
+                        else halo.sprite = oriSkin.halo;
+
+                        MusicCue radiance = self.GetAction<ApplyMusicCue>("Title Up", 3).musicCue.Value as MusicCue;
+                        var chaninfo = ReflectionHelper.GetField<MusicCue, MusicCue.MusicChannelInfo[]>(radiance, "channelInfos")[0];
+                        if (oriSkin.music == null)
+                        {
+                            oriSkin.music = chaninfo.Clip;
+                            Log(oriSkin.music);
+                        }
+                        if (currentSkin.music != null)
+                        {
+                            ReflectionHelper.SetField(chaninfo, "clip", currentSkin.music);
+                        }
+                        else ReflectionHelper.SetField(chaninfo, "clip", oriSkin.music);
                     }
-
-
                     else
                     {
-                        if (skinused&&set.skinID==0) { mat[0].mainTexture = texs[0]; mat[1].mainTexture = texs[1]; mat[2].mainTexture = texs[2]; }
-                        if(skinused&&set.skinID!=0) {
-                            if (skinList[set.skinID].v1) { mat[0].mainTexture = skinList[set.skinID].skin1; Log("1 OK"); }
-                            if (skinList[set.skinID].v2) { mat[1].mainTexture = skinList[set.skinID].skin2; Log("2 OK"); }
-                            if (skinList[set.skinID].v3) { mat[2].mainTexture = skinList[set.skinID].skin3; Log("3 OK"); }
+                        mat[0].mainTexture = oriSkin.skin0;
+                        mat[1].mainTexture = oriSkin.skin1;
+                        mat[2].mainTexture = oriSkin.skin2;
+                        plats.mainTexture = oriSkin.plats;
+                        feather.mainTexture = oriSkin.feather;
+                        shadelord.mainTexture = oriSkin.shadeLord;
+                        dream.mainTexture = oriSkin.dreamEffect;
+                        halo.sprite = oriSkin.halo;
+
+
+
+                        MusicCue radiance = self.GetAction<ApplyMusicCue>("Title Up", 3).musicCue.Value as MusicCue;
+                        var chaninfo = ReflectionHelper.GetField<MusicCue, MusicCue.MusicChannelInfo[]>(radiance, "channelInfos")[0];
+                        if (oriSkin.music == null)
+                        {
+                            oriSkin.music = chaninfo.Clip;
+                        }
+                        else
+                        {
+                            ReflectionHelper.SetField(chaninfo, "clip", oriSkin.music);
                         }
                     }
+
+                    if (set.skinID != 0)
+                    {
+                        if (skins[skinNames[set.skinID]].local.blend)
+                        {
+                            feather.shader = Shader.Find("Sprites/Default");
+                            dream.shader = Shader.Find("Sprites/Default");
+                        }
+                        else
+                        {
+                            feather.shader = Shader.Find("Legacy Shaders/Particles/Additive (Soft)");
+                            dream.shader = Shader.Find("Legacy Shaders/Particles/Additive (Soft)");
+                        }
+                        if (!skins[skinNames[set.skinID]].local.orblight)
+                        {
+                            absoluteRadiance.LocateMyFSM("Attack Commands").GetAction<SpawnObjectFromGlobalPool>("Spawn Fireball", 1).gameObject.Value.FindGameObjectInChildren("Fader").SetActive(false);
+                        }
+                    }
+                    else
+                    {
+                        feather.shader = Shader.Find("Legacy Shaders/Particles/Additive (Soft)");
+                        dream.shader = Shader.Find("Legacy Shaders/Particles/Additive (Soft)");
+                    }
+
+                    if (set.skinID != 0)
+                    {
+                        if (skins[skinNames[set.skinID]].local.customBack)
+                        {
+                            ChangeColor();
+                            AddBackImages();
+                            watcher = new FileSystemWatcher(Path.Combine(_skinFolder, skinNames[set.skinID]), "*.json");
+                            watcherID=set.skinID;
+                            watcher.Changed += ImageChange;
+                           
+                            watcher.EnableRaisingEvents = true;
+                            
+                        }
+                    }
+                   
+                    
+                      
+
+
+
+
                 }
-                catch (Exception e) { Log("NOT ROAR"); }
-                //TextureUtils.WriteTextureToFile(self.gameObject.GetComponent<MeshRenderer>().materials[0].mainTexture, Path.Combine(_dllFolder, "roar.png"));
-                //self.gameObject.GetComponent<MeshRenderer>().materials[0].mainTexture = skinList[set.skinID].skin1;
-                //self.gameObject.GetComponent<MeshRenderer>().materials[1].mainTexture = skinList[set.skinID].skin2;
-                //self.gameObject.GetComponent<MeshRenderer>().materials[2].mainTexture = skinList[set.skinID].skin3;
+                catch (Exception e) { Log(e); Log("NOT ROAR"); }
 
             }
-            /*if(self.FsmName=="Orb Control"&&self.gameObject.name=="Radiant Orb")
+
+            //在radiance的起始阶段替换了其他小图
+            if (self.FsmName == "Control" && self.gameObject.name == "Absolute Radiance")
             {
-                    if (skinList[set.skinID].v7)
+
+                try
+                {
+                    //snowg.LocateMyFSM("Control").SetState("State 2");
+                    //windg.LocateMyFSM("Control").SendEvent("BLIZZARD START");
+                    var halo = self.gameObject.FindGameObjectInChildren("Halo").GetComponent<SpriteRenderer>();
+                    if (set.skinID != 0)
                     {
-                    TextureUtils.WriteTextureToFile(self.FsmVariables.FindFsmGameObject("Particle System").Value.GetComponent<ParticleSystemRenderer>().materials[0].mainTexture, Path.Combine(_dllFolder, "orb.png"));
-                    Log("Orb OK");
-                    //self.FsmVariables.FindFsmGameObject("Particle System").Value.GetComponent<ParticleSystemRenderer>().sharedMaterial
+                        if (skins[skinNames[set.skinID]].halo != null)
+                            halo.sprite = MakeSprite(skins[skinNames[set.skinID]].halo, halo.sprite.pixelsPerUnit);
+                        else halo.sprite = oriSkin.halo;
+                    }
+                    else halo.sprite = oriSkin.halo;
                 }
-            }*/
-            /*if (self.FsmName == "Orb Control" && self.gameObject.name == "Radiant Orb")
-            {
-                if (set.skinID != 0)
-                {
-                    if (skinList[set.skinID].v7)
-                    {
-                        TextureUtils.WriteTextureToFile(self.FsmVariables.FindFsmGameObject("Impact Particles").Value.GetComponent<ParticleSystemRenderer>().materials[0].mainTexture, Path.Combine(_dllFolder, "orb.png"));
-                    }
-                    else
-                    {
+                catch (Exception e) { Log(e); }
 
+                try
+                {
+                    var shotCharge = self.gameObject.FindGameObjectInChildren("Shot Charge").GetComponent<ParticleSystem>();
+                    var shotMain = shotCharge.main;
+                    if (oriSkin.shotYes == false) oriSkin.shotColor = shotMain.startColor;
+                    if (set.skinID != 0) {
+                        UnityEngine.Color color = new();
+                        ColorUtility.TryParseHtmlString(skins[skinNames[set.skinID]].local.shotColor, out color);
+
+                        if (skins[skinNames[set.skinID]].local.shotCharge) shotMain.startColor = new ParticleSystem.MinMaxGradient(color);
+                        else shotMain.startColor = oriSkin.shotColor;
                     }
+                    else { shotMain.startColor = oriSkin.shotColor; }
                 }
-            }*/
-            if (self.FsmName=="Control"&&self.gameObject.name=="Absolute Radiance")
-            {
-                //self.gameObject.AddComponent<test>();
-                /*foreach (var s in self.gameObject.GetComponents<Component>())
-                {
-                    Log(s);
-                }*/
-                if (!skinused) dream = self.gameObject.GetComponent<EnemyHitEffectsGhost>().ghostHitPt.GetComponent<ParticleSystemRenderer>().sharedMaterials[0].mainTexture;
-                if (skinList[set.skinID].v7)
-                {
-                    //Log(self.gameObject.GetComponent<EnemyHitEffectsGhost>().ghostHitPt.GetComponent<ParticleSystemRenderer>().materials[1].mainTexture);
-                    //TextureUtils.WriteTextureToFile(self.gameObject.GetComponent<EnemyHitEffectsGhost>().ghostHitPt.GetComponent<ParticleSystemRenderer>().materials[1].mainTexture, Path.Combine(_dllFolder, "ghosthit.png"));
-                    self.gameObject.GetComponent<EnemyHitEffectsGhost>().ghostHitPt.GetComponent<ParticleSystemRenderer>().sharedMaterials[0].mainTexture = skinList[set.skinID].skin7;
-                    var main = self.gameObject.GetComponent<EnemyHitEffectsGhost>().ghostHitPt.GetComponent<ParticleSystem>().main;
-                     main.startColor  = new ParticleSystem.MinMaxGradient(Color.white);
+                catch (Exception e) { Log(e); }
 
-                    //self.gameObject.GetComponent<EnemyHitEffectsGhost>().slashEffectGhost1.GetComponent<ParticleSystemRenderer>().materials[0].mainTexture = skinList[set.skinID].skin7;
-                    //self.gameObject.GetComponent<EnemyHitEffectsGhost>().slashEffectGhost2.GetComponent<ParticleSystemRenderer>().materials[0].mainTexture = skinList[set.skinID].skin7;
 
-                }
-                else
+                try
                 {
-                    if (skinused)
+                    if (set.Animation)
                     {
-                       //TextureUtils.WriteTextureToFile(texs[6], Path.Combine(_dllFolder, "tex6.png"));
-                        self.gameObject.GetComponent<EnemyHitEffectsGhost>().ghostHitPt.GetComponent<ParticleSystemRenderer>().sharedMaterials[0].mainTexture = texs[6];
-                    }
-
-                }
-                if (set.Animation)
-                {
-                    self.GetAction<GGCheckIfBossSequence>("Tendrils 2", 0).falseEvent = self.GetAction<GGCheckIfBossSequence>("Tendrils 2", 0).trueEvent;
-                    if (!BossSequenceController.IsInSequence)
-                    {
-                        self.ChangeTransition("Final Explode", "FINISHED", "Return to workshop");
-                    }
-                    /*self.RemoveAction("Return to workshop", 0);
-                    self.RemoveAction("Return to workshop", 0);*/
-                }
-                
-                FindAll();
-
-                /*Log(plats);
-                if (plats != null)
-                {*/
-                
-                //Log(hand);
-                //TextureUtils.WriteTextureToFile(sprite.Collection.materials[0].mainTexture, Path.Combine(_dllFolder, sprite.name + ".png"));
-                    /*foreach(var sprite in sprites)
-                    {
-                        Log(sprite);
-                        Log(sprite.Collection);
-                        Log(sprite.Collection.Count);
-                        Log(sprite.Collection.materials.Length);
-                        Log(sprite.Collection.materials[0].mainTexture);
-                    }
-
-                    //var sprites=plats.GetComponent<tk2dSprite>();
-
-                    TextureUtils.WriteTextureToFile(sprites[0].Collection.materials[0].mainTexture, Path.Combine(_dllFolder, sprites[0].name + ".png"));
-                        
-                    }
-                    else { Log("Fail"); }*/
-                   
-                
-                Material[] materials = self.gameObject.GetComponent<tk2dSprite>().Collection.materials;
-                if (set.skinID != 0)
-                {
-                    if (!skinused)
-                    {
-                        skinused = true;
-                        /*texs.Add(materials[0].mainTexture);
-                        texs.Add(materials[1].mainTexture);
-                        texs.Add(materials[2].mainTexture);*/
-                        texs.Add(plats.mainTexture);
-                        texs.Add(hand.mainTexture);
-                        texs.Add(feather.mainTexture);
-                        //texs.Add(dreamdot[0].mainTexture);
-                        texs.Add(dream);
-                        storeHalo = Halo.sprite;
-                    }
-                    /*if (skinList[set.skinID].v1) { materials[0].mainTexture = skinList[set.skinID].skin1; Log("1 OK"); }
-                    if (skinList[set.skinID].v2) { materials[1].mainTexture = skinList[set.skinID].skin2; Log("2 OK"); }
-                    if (skinList[set.skinID].v3) { materials[2].mainTexture = skinList[set.skinID].skin3; Log("3 OK"); }*/
-                    if (skinList[set.skinID].v4) { plats.mainTexture = skinList[set.skinID].skin4; Log("4 OK"); }
-                    if (skinList[set.skinID].v5) { hand.mainTexture = skinList[set.skinID].skin5; Log("5 OK"); }
-                    if (skinList[set.skinID].v6) { feather.mainTexture = skinList[set.skinID].skin6; Log("6 OK"); }
-                    if (skinList[set.skinID].v7) { foreach (var mat in dreamdot) { mat.mainTexture = skinList[set.skinID].skin7; Log("7 OK"); } }
-                    //if (skinList[set.skinID].v7) { dreamdot[0].mainTexture = skinList[set.skinID].skin7;}
-                    if (skinList[set.skinID].v9) { Halo.sprite = MakeSprite(skinList[set.skinID].skin9, Halo.sprite.pixelsPerUnit); }
-                }
-                else
-                {
-                    if (skinused)
-                    {
-                        materials[0].mainTexture = texs[0];
-                        materials[1].mainTexture = texs[1];
-                        materials[2].mainTexture = texs[2];
-                        plats.mainTexture = texs[3];
-                        hand.mainTexture = texs[4];
-                        feather.mainTexture = texs[5];
-                        foreach (var mat in dreamdot)
+                        self.GetAction<GGCheckIfBossSequence>("Tendrils 2", 0).falseEvent = self.GetAction<GGCheckIfBossSequence>("Tendrils 2", 0).trueEvent;
+                        if (!BossSequenceController.IsInSequence)
                         {
-                            mat.mainTexture = texs[6];
+                            self.ChangeTransition("Final Explode", "FINISHED", "Return to workshop");
                         }
-                        Halo.sprite = storeHalo;
-                        }
+                    }
+
+
                 }
+                catch (Exception e) { Log(e); }
             }
 
             orig(self);
         }
 
-        private void FindAll()
+        private void ImageChange(object sender, FileSystemEventArgs e)
         {
-            Scene scene = SceneUtils.getCurrentScene();
-            var golist = scene.GetAllGameObjects();
-           
-            foreach (var g in golist) { 
-                if(g.name == "Plat Sets") { plats = g.GetComponentsInChildren<tk2dSprite>()[0].Collection.materials[0]; }
-                if(g.name == "Shade Lord Hand"){ hand = g.GetComponent<tk2dSprite>().Collection.materials[0]; }
-                if( g.name == "Pt Feather Burst") { feather = g.GetComponent<ParticleSystemRenderer>().materials[0]; }
-                if(g.name.IsAny(dreamdotstring)) { 
-                    Log(g.GetComponent<ParticleSystemRenderer>().materials.Length);
-                    dreamdot.Add(g.GetComponent<ParticleSystemRenderer>().sharedMaterials[0]);
-                    if (skinList[set.skinID].v7)
-                    {
-                        var main = g.GetComponent<ParticleSystem>().main;
-                        main.startColor = Color.white;
-                    }
-                    //main.cullingMode
-                }
-                if (g.name == "Halo") { Halo = g.GetComponent<SpriteRenderer>();/*TextureUtils.WriteTextureToFile(Halo.sprite.texture, Path.Combine(_dllFolder, "Halo.png"));*/ }
+            if (set.skinID != watcherID) { return; }
+            Log("CHANGE");
+            LoadBackImage(set.skinID,true);
+            AddBackImages();
+        }
+
+        public void ChangeColor()
+        {
+
+            GameObject GG_Arena_Prefab = GameObject.Find("GG_Arena_Prefab");
+            if (GG_Arena_Prefab != null)
+            {
             }
-            
+            GameObject bg = GG_Arena_Prefab.FindGameObjectInChildren("BG");
+            List<GameObject> lists = new();
+            bg.FindAllChildren(lists);
+
+            foreach (var g in lists)
+            {
+                UnityEngine.Color color;
+                ColorUtility.TryParseHtmlString(skins[skinNames[set.skinID]].local.backColor, out color);
+                if (g.name.Contains("haze") || g.name.Contains("straight"))
+                {
+                    var render = g.GetComponent<SpriteRenderer>();
+                    if (render != null) render.color = color;
+                }
+                else if (g.name.Contains("GG_scenery_0004_17"))
+                {
+                    var render = g.GetComponent<SpriteRenderer>();
+                    if (render != null)
+                    {
+                        if (oriSkin.cloud == null) oriSkin.cloud = render.sprite;
+                        if (skins[skinNames[set.skinID]].cloud != null) { render.sprite = MakeSprite(skins[skinNames[set.skinID]].cloud, render.sprite.pixelsPerUnit); }
+                        else render.sprite = oriSkin.cloud;
+                    }
+                    if (skins[skinNames[set.skinID]].local.removeCloud) { g.SetActive(false); } 
+                }
+                else if (g.name.Contains("BlurPlane") || g.name.Contains("GG_gods_ray")) ;
+                else if(skins[skinNames[set.skinID]].local.removeOthers) g.SetActive(false);
+            }
+            string removeg = "gg_aerial";
+            GameObject.Find(removeg).SetActive(false);
+            for (int i = 1; i < 5; i++)
+            {
+                GameObject.Find(removeg + " (" + i + ")").SetActive(false);
+            }
+
+            GameObject.Find("GG_pillar_top").SetActive(false);
+            GameObject.Find("Godseeker Crowd").SetActive(false);
+
+        }
+
+        public void AddBackImages()
+        {
+            foreach(var g in customSprites)
+            {
+                if(g!=null) GameObject.Destroy(g);
+            }
+            customSprites.Clear();
+            foreach (var g in skins[skinNames[set.skinID]].backimageSettings) 
+            {
+                foreach (var po in g.positions)
+                {
+                    GameObject temp = new GameObject(g.name);
+                    customSprites.Add(temp);
+                    Log(temp);
+                    g.gameObject = temp;
+                    temp.transform.position = new Vector3(po.x,po.y,po.z);
+                    if (g.type == BackImage.ImageType.PNG)
+                    {
+                        var render = temp.GetAddComponent<SpriteRenderer>();
+                        render.sprite = skins[skinNames[set.skinID]].images[g.name];
+                        render.color = new UnityEngine.Color(render.color.r, render.color.g, render.color.b, po.a);
+                    }
+                    else if(g.type== BackImage.ImageType.GIF)
+                    {
+                        var gif=temp.GetAddComponent<PlayGifAction>();
+                        gif.gifName = g.name;
+                        gif.tex2DList= skins[skinNames[set.skinID]].gifs[g.name];
+                        gif.color = new UnityEngine.Color(1, 1, 1, po.a);
+                    }
+                }
+            }
+            foreach (var g in skins[skinNames[set.skinID]].backimageSettings)
+            {
+                Log(g.gameObject);
+            }
+            if (skins[skinNames[set.skinID]].local.wind)
+            {
+                windg.SetActive(true);
+                windg.transform.position = new Vector3(68, 23, 0);
+                windg.LocateMyFSM("Control").SendEvent("BLIZZARD START");
+            }
+            if (skins[skinNames[set.skinID]].local.snow) snowg.SetActive(true); 
+        }
+
+        public static AudioClip LoadAudioClip(string path, string name)
+        {
+            var stream = new StreamReader(path);
+            //var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream(path);
+            var wavData = new WavData();
+            wavData.Parse(stream.BaseStream);
+            stream.Close();
+            var samples = wavData.GetSamples();
+            var clip = AudioClip.Create(name, samples.Length / wavData.FormatChunk.NumChannels, wavData.FormatChunk.NumChannels, (int)wavData.FormatChunk.SampleRate, false);
+            clip.SetData(samples, 0);
+            return clip;
         }
 
         public void Unload()
         {
             On.PlayMakerFSM.OnEnable -= ReplaceSkin;
             ModHooks.LanguageGetHook -= Changelanguage;
+            ModHooks.ObjectPoolSpawnHook -= RemoveOrbLight;
+            UnityEngine.SceneManagement.SceneManager.activeSceneChanged -= FindStatue;
         }
 
         public List<IMenuMod.MenuEntry> GetMenuData(IMenuMod.MenuEntry? toggleButtonEntry)
         {
             List<IMenuMod.MenuEntry> menus = new();
-            if(toggleButtonEntry.HasValue) menus.Add(toggleButtonEntry.Value);
             menus.Add(
                 new IMenuMod.MenuEntry
                 {
@@ -513,7 +717,7 @@ namespace RadianceSkin
                     Loader = () => set.skinID,
                     Saver = i => set.skinID = i
                 }
-                ) ;
+                );
             menus.Add(
                 new IMenuMod.MenuEntry
                 {
@@ -528,19 +732,175 @@ namespace RadianceSkin
                     Loader = () => set.Animation ? 0 : 1,
                     Saver = i => set.Animation = i == 0
                 }
-                 ) ;
+                 );
+            /*menus.Add(
+                new IMenuMod.MenuEntry
+                {
+                    Name = "混合模式",
+                    Description = "加法混合或常规混合",
+                    Values = new string[]
+                {
+                    //Language.Language.Get("MOH_ON", "MainMenu"),
+                    //Language.Language.Get("MOH_OFF", "MainMenu"),
+                    "常规混合",
+                    "加法混合"
+
+                },
+
+                    Loader = () => set.blend ? 0 : 1,
+                    Saver = i => set.blend = i == 0
+                }
+                 );*/
             return menus;
         }
         public static Sprite MakeSprite(Texture2D tex, float ppu) =>
             Sprite.Create(tex, new Rect(0f, 0f, tex.width, tex.height), new Vector2(0.5f, 0.5f), ppu);
+
+        private byte[] Bitmap2Byte(Bitmap bitmap)
+        {
+            using (MemoryStream stream = new MemoryStream())
+            {
+                // 将bitmap 以png格式保存到流中
+                bitmap.Save(stream, ImageFormat.Png);
+                // 创建一个字节数组，长度为流的长度
+                byte[] data = new byte[stream.Length];
+                // 重置指针
+                stream.Seek(0, SeekOrigin.Begin);
+                // 从流读取字节块存入data中
+                stream.Read(data, 0, Convert.ToInt32(stream.Length));
+                return data;
+            }
+        }
+
+        public List<Texture2D> MyGifSet(System.Drawing.Image image)
+        {
+            List<Texture2D> tex = new List<Texture2D>();
+            if (image != null)
+            {
+                FrameDimension frame = new FrameDimension(image.FrameDimensionsList[0]);
+                int framCount = image.GetFrameCount(frame);//获取维度帧数
+                for (int i = 0; i < framCount; ++i)
+                {
+                    image.SelectActiveFrame(frame, i);
+                    Bitmap framBitmap = new Bitmap(image.Width, image.Height);
+                    using (System.Drawing.Graphics graphic = System.Drawing.Graphics.FromImage(framBitmap))
+                    {
+                        graphic.DrawImage(image, Point.Empty);
+                    }
+                    Texture2D frameTexture2D = new Texture2D(framBitmap.Width, framBitmap.Height, TextureFormat.ARGB32, true);
+                    frameTexture2D.LoadImage(Bitmap2Byte(framBitmap));
+                    tex.Add(frameTexture2D);
+                }
+            }
+            return tex;
+        }
+
+ 
         public void OnLoadGlobal(Setting s)
         {
+            
             set = s;
         }
 
         public Setting OnSaveGlobal()
         {
+            foreach (var skin in skins)
+            {
+               SaveLocal(skin.Value.id);
+               SaveBackImages(skin.Value.id);
+            }
             return set;
+        }
+
+
+
+
+        public void LoadLocal(int id)
+        {
+            string skinfolderSetting = Path.Combine(_dllFolder,"Skins", skinNames[id], "LocalSettings.json");
+            LocalSetting localSetting;
+            Log("LOAD");
+            if (File.Exists(skinfolderSetting))
+                {
+                Log("READ");
+                    localSetting=JsonUtility.FromJson<LocalSetting>(File.ReadAllText(skinfolderSetting));
+                }   
+            else { 
+                    localSetting = new LocalSetting(); 
+                    File.WriteAllText(skinfolderSetting,JsonUtility.ToJson(localSetting,true));
+                Log("WRITE");
+                }
+             skins[skinNames[id]].local = localSetting;
+            
+        }
+
+        public void SaveLocal(int id)
+        {
+            string skinfolderSetting = Path.Combine(_dllFolder, "Skins", skinNames[id], "LocalSettings.json");
+            LocalSetting localSetting= skins[skinNames[id]].local;
+            File.WriteAllText(skinfolderSetting, JsonUtility.ToJson(localSetting, true));
+            Log("Write");
+
+        }
+
+        public void LoadBackImage(int id)
+        {
+            LoadBackImage(id, false);
+        }
+        public void LoadBackImage(int id,bool onlyRead)
+        {
+            string skinfolderSetting = Path.Combine(_dllFolder, "Skins", skinNames[id], "BackImages.json");
+            Log("LOAD");
+            if (File.Exists(skinfolderSetting))
+            {
+                Log("READ");
+                try
+                {
+                    var list = JsonConvert.DeserializeObject<List<BackImage>>(File.ReadAllText(skinfolderSetting));
+                    ListUnion(skins[skinNames[id]].backimageSettings, list);
+                }
+                catch { 
+                    foreach(var i in skins[skinNames[id]].backimageSettings)
+                    {
+                        if (i.positions.Count == 0) i.positions.Add(new());
+                    }
+                }
+                if(!onlyRead) SaveBackImages(id);
+
+            }
+            else
+            {
+                if (!onlyRead) SaveBackImages(id);
+            }
+        }
+        public void SaveBackImages(int id)
+        { 
+            string skinfolderSetting = Path.Combine(_dllFolder, "Skins", skinNames[id], "BackImages.json");
+            Log(JsonConvert.SerializeObject(skins[skinNames[id]].backimageSettings));
+            string data = JsonConvert.SerializeObject(skins[skinNames[id]].backimageSettings,Formatting.Indented);
+            File.WriteAllText(skinfolderSetting, data);
+            Log("WRITE");
+        }
+
+        public void ListUnion(List<BackImage> list1,List<BackImage> list2)
+        {
+
+            foreach(BackImage item in list1)
+            {
+                foreach(BackImage item2 in list2)
+                {
+                    if(item.name== item2.name)
+                    {
+                        item.positions=item2.positions;
+                        item.type=item2.type;
+                        break;
+                    }
+                }
+                if (item.positions.Count == 0)
+                {
+                    item.positions.Add(new());
+                }
+            }
         }
     }
 }
