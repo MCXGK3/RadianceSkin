@@ -14,6 +14,8 @@ using WavLib;
 using Newtonsoft.Json;
 using System.Drawing;
 using System.Drawing.Imaging;
+using MonoMod.Cil;
+using GlobalEnums;
 
 namespace RadianceSkin
 {
@@ -29,8 +31,10 @@ namespace RadianceSkin
         const string snow = "pre_blizzard_particles";
         public GameObject snowg=null;
         List<GameObject> customSprites= new List<GameObject>();
+        public bool usewatcher=false;
         FileSystemWatcher watcher=null;
         public int watcherID=0;
+        public GameObject reChangeColor;
 
         public override List<ValueTuple<string, string>> GetPreloadNames()
         {
@@ -121,7 +125,7 @@ namespace RadianceSkin
 
         public override string GetVersion()
         {
-            return "t.e.1.0";
+            return "0.0.0.9";
         }
 
         public override void Initialize(Dictionary<string, Dictionary<string, GameObject>> preloadedObjects)
@@ -132,7 +136,9 @@ namespace RadianceSkin
             ModHooks.LanguageGetHook += Changelanguage;
             ModHooks.ObjectPoolSpawnHook += RemoveOrbLight;
             UnityEngine.SceneManagement.SceneManager.activeSceneChanged += FindStatue;
-           
+            reChangeColor = new();
+            reChangeColor.AddComponent<test>();
+            UObject.DontDestroyOnLoad(reChangeColor);
             GetWindAndSnow(preloadedObjects);
             skins.Clear();
 
@@ -388,7 +394,10 @@ namespace RadianceSkin
                 if(windg.activeSelf)windg.LocateMyFSM("Control").SendEvent("BLIZZARD END");
                 windg.SetActive(false);
                 snowg.SetActive(false);
-                if (watcher != null) {watcher.EnableRaisingEvents = false; watcher.Dispose(); watcher = null;}
+                if (usewatcher)
+                {
+                    if (watcher != null) { watcher.EnableRaisingEvents = false; watcher.Dispose(); watcher = null; }
+                }
             }
             
         }
@@ -510,11 +519,14 @@ namespace RadianceSkin
                         {
                             ChangeColor();
                             AddBackImages();
-                            watcher = new FileSystemWatcher(Path.Combine(_skinFolder, skinNames[set.skinID]), "*.json");
-                            watcherID=set.skinID;
-                            watcher.Changed += ImageChange;
-                           
-                            watcher.EnableRaisingEvents = true;
+                            if (usewatcher)
+                            {
+                                watcher = new FileSystemWatcher(Path.Combine(_skinFolder, skinNames[set.skinID]), "*.json");
+                                watcherID = set.skinID;
+                                watcher.Changed += ImageChange;
+
+                                watcher.EnableRaisingEvents = true;
+                            }
                             
                         }
                     }
@@ -595,10 +607,11 @@ namespace RadianceSkin
 
         public void ChangeColor()
         {
-
+            bool flag= false;
             GameObject GG_Arena_Prefab = GameObject.Find("GG_Arena_Prefab");
             if (GG_Arena_Prefab != null)
             {
+                
             }
             GameObject bg = GG_Arena_Prefab.FindGameObjectInChildren("BG");
             List<GameObject> lists = new();
@@ -610,6 +623,9 @@ namespace RadianceSkin
                 ColorUtility.TryParseHtmlString(skins[skinNames[set.skinID]].local.backColor, out color);
                 if (g.name.Contains("haze") || g.name.Contains("straight"))
                 {
+                    var te = g.GetComponent<test>();
+                    if(te!= null) { flag = true; }
+                    g.AddComponent<test>();
                     var render = g.GetComponent<SpriteRenderer>();
                     if (render != null) render.color = color;
                 }
@@ -628,15 +644,25 @@ namespace RadianceSkin
                 else if(skins[skinNames[set.skinID]].local.removeOthers) g.SetActive(false);
             }
             string removeg = "gg_aerial";
-            GameObject.Find(removeg).SetActive(false);
+            var go = GameObject.Find(removeg);
+             if(go!=null)  go.SetActive(false);
             for (int i = 1; i < 5; i++)
             {
-                GameObject.Find(removeg + " (" + i + ")").SetActive(false);
+                var re = GameObject.Find(removeg + " (" + i + ")");
+                if(re!=null) re.SetActive(false);
             }
+            
+            go = GameObject.Find("GG_pillar_top");
+            if(go!=null)     go.SetActive(false);
+            go = GameObject.Find("Godseeker Crowd");
+            if(go!=null) go.SetActive(false);
+            if (flag) reChangeColor.GetComponent<test>().StartCoroutine(WaitAndChange(0.2f));
+        }
 
-            GameObject.Find("GG_pillar_top").SetActive(false);
-            GameObject.Find("Godseeker Crowd").SetActive(false);
-
+        public IEnumerator WaitAndChange(float time)
+        {
+            yield return new WaitForSeconds(time);
+            ChangeColor();
         }
 
         public void AddBackImages()
