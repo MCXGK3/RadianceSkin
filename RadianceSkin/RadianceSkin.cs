@@ -121,7 +121,7 @@ namespace RadianceSkin
 
         public override string GetVersion()
         {
-            return "t.e.0.9";
+            return "t.e.1.0";
         }
 
         public override void Initialize(Dictionary<string, Dictionary<string, GameObject>> preloadedObjects)
@@ -388,7 +388,7 @@ namespace RadianceSkin
                 if(windg.activeSelf)windg.LocateMyFSM("Control").SendEvent("BLIZZARD END");
                 windg.SetActive(false);
                 snowg.SetActive(false);
-                if (watcher != null) {  watcher.EnableRaisingEvents = false; watcher.Dispose(); watcher = null; }
+                if (watcher != null) {watcher.EnableRaisingEvents = false; watcher.Dispose(); watcher = null;}
             }
             
         }
