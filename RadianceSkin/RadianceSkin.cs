@@ -35,6 +35,7 @@ namespace RadianceSkin
         FileSystemWatcher watcher=null;
         public int watcherID=0;
         public GameObject reChangeColor;
+        public int ColorCount=0;
 
         public override List<ValueTuple<string, string>> GetPreloadNames()
         {
@@ -125,7 +126,7 @@ namespace RadianceSkin
 
         public override string GetVersion()
         {
-            return "0.0.0.9";
+            return "0.0.0.11";
         }
 
         public override void Initialize(Dictionary<string, Dictionary<string, GameObject>> preloadedObjects)
@@ -312,6 +313,7 @@ namespace RadianceSkin
             }
 
             //处理异常情况
+            if (set.skinID >= skinNames.Count) set.skinID = 0;
             if (!skins.ContainsKey(skinNames[set.skinID]))
             {
                 set.skinID = 0;
@@ -407,6 +409,7 @@ namespace RadianceSkin
             //在bosscontrol的起始阶段替换了辐光的三张主图和音乐
             if (self.FsmName == "Control" && self.gameObject.name == "Boss Control")
             {
+                ColorCount = 0;
                 //TODO替换场景颜色
                 try
                 {
@@ -518,16 +521,24 @@ namespace RadianceSkin
                         if (skins[skinNames[set.skinID]].local.customBack)
                         {
                             ChangeColor();
-                            AddBackImages();
-                            if (usewatcher)
-                            {
-                                watcher = new FileSystemWatcher(Path.Combine(_skinFolder, skinNames[set.skinID]), "*.json");
-                                watcherID = set.skinID;
-                                watcher.Changed += ImageChange;
 
-                                watcher.EnableRaisingEvents = true;
-                            }
-                            
+                        }
+                        if (skins[skinNames[set.skinID]].local.watcher)
+                        {
+                            usewatcher = true;
+                            watcher = new FileSystemWatcher(Path.Combine(_skinFolder, skinNames[set.skinID]), "*.json");
+                            watcherID = set.skinID;
+                            watcher.Changed += ImageChange;
+
+                            watcher.EnableRaisingEvents = true;
+                        }
+                        else
+                        {
+                            usewatcher = false;
+                        }
+                        if (skins[skinNames[set.skinID]].local.addImage)
+                        {
+                            AddBackImages();
                         }
                     }
                    
@@ -607,7 +618,11 @@ namespace RadianceSkin
 
         public void ChangeColor()
         {
-            bool flag= false;
+            ColorCount++;
+            Log("CHANGE");
+            bool flag = false;
+            if (SceneUtils.getCurrentScene().name!="GG_Radiance")
+            { flag = true; }
             GameObject GG_Arena_Prefab = GameObject.Find("GG_Arena_Prefab");
             if (GG_Arena_Prefab != null)
             {
@@ -619,15 +634,25 @@ namespace RadianceSkin
 
             foreach (var g in lists)
             {
-                UnityEngine.Color color;
-                ColorUtility.TryParseHtmlString(skins[skinNames[set.skinID]].local.backColor, out color);
-                if (g.name.Contains("haze") || g.name.Contains("straight"))
+                UnityEngine.Color hazecolor;
+                UnityEngine.Color lightcolor;
+                ColorUtility.TryParseHtmlString(skins[skinNames[set.skinID]].local.hazeColor, out hazecolor);
+                ColorUtility.TryParseHtmlString(skins[skinNames[set.skinID]].local.lightColor, out lightcolor);
+                if (g.name.Contains("haze") )
                 {
                     var te = g.GetComponent<test>();
                     if(te!= null) { flag = true; }
                     g.AddComponent<test>();
                     var render = g.GetComponent<SpriteRenderer>();
-                    if (render != null) render.color = color;
+                    if (render != null) render.color = hazecolor;
+                }
+                else if (g.name.Contains("straight"))
+                {
+                    var te = g.GetComponent<test>();
+                    if (te != null) { flag = true; }
+                    g.AddComponent<test>();
+                    var render = g.GetComponent<SpriteRenderer>();
+                    if (render != null) render.color = lightcolor;
                 }
                 else if (g.name.Contains("GG_scenery_0004_17"))
                 {
@@ -656,7 +681,7 @@ namespace RadianceSkin
             if(go!=null)     go.SetActive(false);
             go = GameObject.Find("Godseeker Crowd");
             if(go!=null) go.SetActive(false);
-            if (flag) reChangeColor.GetComponent<test>().StartCoroutine(WaitAndChange(0.2f));
+            if (flag&&ColorCount<=5) reChangeColor.GetComponent<test>().StartCoroutine(WaitAndChange(0.2f));
         }
 
         public IEnumerator WaitAndChange(float time)
@@ -849,7 +874,15 @@ namespace RadianceSkin
             if (File.Exists(skinfolderSetting))
                 {
                 Log("READ");
-                    localSetting=JsonUtility.FromJson<LocalSetting>(File.ReadAllText(skinfolderSetting));
+                string content = File.ReadAllText(skinfolderSetting);
+                    localSetting =JsonUtility.FromJson<LocalSetting>(content);
+                var setting = JsonUtility.FromJson<OldLocalSetting>(content);
+                if (setting.backColor != "#FFFFFFFF")
+                {
+                    localSetting.hazeColor = setting.backColor;
+                    localSetting.lightColor = setting.backColor;
+                    localSetting.addImage = setting.customBack;
+                }
                 }   
             else { 
                     localSetting = new LocalSetting(); 
