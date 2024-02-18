@@ -136,6 +136,7 @@ namespace RadianceSkin
             On.PlayMakerFSM.OnEnable += ReplaceSkin;
             ModHooks.LanguageGetHook += Changelanguage;
             ModHooks.ObjectPoolSpawnHook += RemoveOrbLight;
+            On.SpriteFlash.flashFocusHeal += FlashLight;
             UnityEngine.SceneManagement.SceneManager.activeSceneChanged += FindStatue;
             reChangeColor = new();
             reChangeColor.AddComponent<test>();
@@ -569,6 +570,7 @@ namespace RadianceSkin
                         else halo.sprite = oriSkin.halo;
                     }
                     else halo.sprite = oriSkin.halo;
+                    
                 }
                 catch (Exception e) { Log(e); }
 
@@ -606,6 +608,16 @@ namespace RadianceSkin
             }
 
             orig(self);
+        }
+
+        private void FlashLight(On.SpriteFlash.orig_flashFocusHeal orig, SpriteFlash self)
+        {
+            orig(self);
+            if(self.gameObject.name=="Absolute Radiance"||self.gameObject.name=="Legs")
+            {
+                if(set.skinID!=0)
+                ReflectionHelper.SetField<SpriteFlash, float>(self, "amount", skins[skinNames[set.skinID]].local.hitLight);
+            }
         }
 
         private void ImageChange(object sender, FileSystemEventArgs e)
@@ -753,6 +765,7 @@ namespace RadianceSkin
             ModHooks.LanguageGetHook -= Changelanguage;
             ModHooks.ObjectPoolSpawnHook -= RemoveOrbLight;
             UnityEngine.SceneManagement.SceneManager.activeSceneChanged -= FindStatue;
+            On.SpriteFlash.flashFocusHeal -= FlashLight;
         }
 
         public List<IMenuMod.MenuEntry> GetMenuData(IMenuMod.MenuEntry? toggleButtonEntry)
@@ -885,6 +898,7 @@ namespace RadianceSkin
                 }
                 }   
             else { 
+                    
                     localSetting = new LocalSetting(); 
                     File.WriteAllText(skinfolderSetting,JsonUtility.ToJson(localSetting,true));
                 Log("WRITE");

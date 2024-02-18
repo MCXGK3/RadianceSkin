@@ -28,6 +28,7 @@ namespace RadianceSkin
         public string lightColor = "#FFFFFFFF";
         public bool snow=false;
         public bool orblight = true;
+        public float hitLight = 0.85f;
         [NonSerialized]
         public bool wind = false;   
         
