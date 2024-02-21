@@ -73,4 +73,27 @@ public class PlayGifAction : MonoBehaviour
             return data;
         }
     }
+
+    //byte[] 转换 Bitmap
+    public static Bitmap BytesToBitmap(byte[] Bytes)
+    {
+        MemoryStream stream = null;
+        try
+        {
+            stream = new MemoryStream(Bytes);
+            return new Bitmap(stream);
+        }
+        catch (ArgumentNullException ex)
+        {
+            throw ex;
+        }
+        catch (ArgumentException ex)
+        {
+            throw ex;
+        }
+        finally
+        {
+            stream.Close();
+        }
+    } 
 }

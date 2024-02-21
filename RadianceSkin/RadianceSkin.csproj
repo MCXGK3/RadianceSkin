@@ -337,4 +337,9 @@
   <ItemGroup>
     <PackageReference Include="WavLib" Version="1.0.1" />
   </ItemGroup>
+  <ItemGroup>
+    <Reference Update="System.Drawing">
+      <SpecificVersion>False</SpecificVersion>
+    </Reference>
+  </ItemGroup>
 </Project>

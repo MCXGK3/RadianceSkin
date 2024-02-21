@@ -16,6 +16,10 @@ using System.Drawing;
 using System.Drawing.Imaging;
 using MonoMod.Cil;
 using GlobalEnums;
+using Steamworks;
+using System.Windows.Controls;
+using System.Windows.Media.Imaging;
+using System.Windows.Automation.Peers;
 
 namespace RadianceSkin
 {
@@ -41,7 +45,6 @@ namespace RadianceSkin
         {
             return new List<ValueTuple<string, string>>
             {
-
                 new ValueTuple<string, string>(hornetScene, wind),
                 new ValueTuple<string, string>(hornetScene, snow),
             };
@@ -116,6 +119,7 @@ namespace RadianceSkin
         public bool found = false;
 
         private int i = 0;
+       
 
         public bool ToggleButtonInsideMenu => true;
 
@@ -126,7 +130,7 @@ namespace RadianceSkin
 
         public override string GetVersion()
         {
-            return "0.0.0.11";
+            return "0.1.0.0";
         }
 
         public override void Initialize(Dictionary<string, Dictionary<string, GameObject>> preloadedObjects)
@@ -160,6 +164,7 @@ namespace RadianceSkin
                     skin.id = skinNames.IndexOf(skinName);
 
                     string[] assetsNames = Directory.GetFiles(skinFolderName);
+                    
 
                     foreach (var assestName in assetsNames)
                     {
@@ -278,15 +283,11 @@ namespace RadianceSkin
                         }
                         if (assestName.EndsWith(".gif"))
                         {
+                           /* skin.backimageSettings.Add(new BackImage() { name = tempname, type = BackImage.ImageType.GIF });
+                            System.Drawing.Image image =PlayGifAction.BytesToBitmap(File.ReadAllBytes(assestName));
+                            skin.gifs.Add(tempname,MyGifSet(image));*/
                             
                             
-                            /*skin.backimageSettings.Add(new BackImage() { name = tempname, type = BackImage.ImageType.GIF });
-                            Log("BEGIN");
-                            Log(assestName.ToCharArray());
-                            System.Drawing.Image image = System.Drawing.Image.FromFile(assestName);
-                            Log(image);
-                            Log("IMAGE");
-                            skin.gifs.Add(tempname, MyGifSet(System.Drawing.Image.FromFile(assestName)));*/
                         }
                         if (assestName.EndsWith(".wav"))
                         {
@@ -394,12 +395,17 @@ namespace RadianceSkin
 
             if (arg0.name == "GG_Radiance")
             {
-                if(windg.activeSelf)windg.LocateMyFSM("Control").SendEvent("BLIZZARD END");
-                windg.SetActive(false);
-                snowg.SetActive(false);
-                if (usewatcher)
+                if (arg1.name != "GG_Radiance")
                 {
-                    if (watcher != null) { watcher.EnableRaisingEvents = false; watcher.Dispose(); watcher = null; }
+                    if (windg.activeSelf) windg.LocateMyFSM("Control").SendEvent("BLIZZARD END");
+                    windg.SetActive(false);
+                    snowg.SetActive(false);
+                    Log("DISABLE");
+                    if (usewatcher)
+                    {
+
+                        if (watcher != null) { watcher.EnableRaisingEvents = false; watcher.Dispose(); watcher = null; }
+                    }
                 }
             }
             
@@ -570,6 +576,12 @@ namespace RadianceSkin
                         else halo.sprite = oriSkin.halo;
                     }
                     else halo.sprite = oriSkin.halo;
+
+
+                    self.InsertCustomAction("Ending Scene", () =>
+                    {
+                        snowg.SetActive(false);
+                    }, 0);
                     
                 }
                 catch (Exception e) { Log(e); }
@@ -743,7 +755,11 @@ namespace RadianceSkin
                 windg.transform.position = new Vector3(68, 23, 0);
                 windg.LocateMyFSM("Control").SendEvent("BLIZZARD START");
             }
-            if (skins[skinNames[set.skinID]].local.snow) snowg.SetActive(true); 
+            if (skins[skinNames[set.skinID]].local.snow)
+            {
+                snowg.SetActive(true);
+                Log("ACTIVE");
+            }
         }
 
         public static AudioClip LoadAudioClip(string path, string name)
